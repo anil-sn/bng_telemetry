@@ -1,6 +1,14 @@
 # bng_telemetry
 A full-stack, open-source solution for streaming per-subscriber telemetry data from a BNG, collecting it in a time-series database, and applying machine learning for network analytics, anomaly detection, and predictive insights.
 
+## Architecture Stack:
+
+* **BNG (Broadband Network Gateway)**: Source of per-subscriber statistics
+* **Telegraf**: gNMI client for telemetry collection
+* **InfluxDB**: Time-series database for storing metrics
+* **Grafana**: Visualization and dashboards
+* **Jupyter Notebooks**: AI/ML analytics engine   
+
 ## Project Overview
 
 This project provides a complete and modular pipeline for network telemetry and analytics, specifically designed for Broadband Network Gateways (BNGs). By leveraging modern streaming telemetry protocols (like gNMI over gRPC), we bypass traditional polling methods to capture high-volume, real-time, per-subscriber statistics. The collected data is then used to fuel AI and ML models for advanced network intelligence.
