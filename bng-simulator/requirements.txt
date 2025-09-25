@@ -1,0 +1,5 @@
+# gNMI library for Python
+pygnmi>=0.8.0
+
+# Library for generating fake data (MAC addresses)
+faker>=10.0.0

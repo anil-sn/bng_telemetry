@@ -1,0 +1,28 @@
+# This file configures the data sources for Grafana.
+# It will be automatically loaded on startup.
+
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB-BNG
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      # InfluxDB v2 uses Flux as the query language
+      version: Flux
+      # This should match the organization created in your .env file
+      organization: bng-telemetry-org
+      # The default bucket to query
+      defaultBucket: bng-bucket
+      # Timeout for queries
+      httpMode: POST
+    secureJsonData:
+      # The InfluxDB token. This is managed securely by Grafana and is not
+      # exposed to the browser. The value is passed via environment variables
+      # in the docker-compose.yml file.
+      token: '${GF_DATASOURCES_DEFAULT_DATASOURCE_SECURE_JSON_DATA_TOKEN}'
+    # This makes this the default data source for new panels
+    isDefault: true
+    # Allow editing this data source in the Grafana UI
+    editable: true

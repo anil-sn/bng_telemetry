@@ -1,0 +1,129 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_INFLUXDB-BNG",
+      "label": "InfluxDB-BNG",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "influxdb",
+      "pluginName": "InfluxDB"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "8.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "influxdb",
+      "name": "InfluxDB",
+      "version": "1.0.0"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": 1,
+  "links": [],
+  "panels": [
+    {
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.5.2",
+      "targets": [
+        {
+          "datasource": "${DS_INFLUXDB-BNG}",
+          "query": "from(bucket: \"bng-bucket\")\n  |> range(v.timeRangeStart, v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"bng_subscriber_stats\")\n  |> filter(fn: (r) => r[\"_field\"] == \"state\" and r.state == \"ACTIVE\")\n  |> last()\n  |> group()\n  |> count()",
+          "refId": "A"
+        }
+      ],
+      "title": "Active Subscribers",
+      "type": "stat"
+    },
+    {
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "${DS_INFLUXDB-BNG}",
+          "query": "from(bucket: \"bng-bucket\")\n  |> range(v.timeRangeStart, v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"bng_subscriber_stats\")\n  |> filter(fn: (r) => r[\"_field\"] == \"input_octets\" or r[\"_field\"] == \"output_octets\")\n  |> aggregateWindow(every: v.windowPeriod, fn: increase, createEmpty: false)\n  |> group()\n  |> sum()\n  |> map(fn: (r) => ({ r with _value: r._value / float(v: v.windowPeriod) * 8.0}))\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Bandwidth (bps)",
+      "type": "timeseries"
+    },
+    {
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 8 },
+      "id": 6,
+      "options": {
+        "showHeader": true
+      },
+      "pluginVersion": "8.5.2",
+      "targets": [
+        {
+          "datasource": "${DS_INFLUXDB-BNG}",
+          "query": "from(bucket: \"bng-bucket\")\n|> range(v.timeRangeStart, v.timeRangeStop)\n|> filter(fn: (r) => r[\"_measurement\"] == \"bng_subscriber_stats\" and r[\"_field\"] == \"input_octets\")\n|> increase()\n|> group(columns: [\"mac\"])\n|> sum()\n|> sort(columns: [\"_value\"], desc: true)\n|> limit(n: 50)\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Subscribers by Input Traffic",
+      "type": "table"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 35,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "BNG Subscriber Monitoring",
+  "uid": "bng-main-dashboard",
+  "version": 1
+}

@@ -35,6 +35,33 @@ The data flows through the system as follows:
 +----------------------------------------+      +--------------------------------------+
 
 ```
+bng_telemetry/
+├── .env                  # Environment variables for InfluxDB credentials and config
+├── .env.example          # Example environment file for users to copy
+├── .gitignore            # Standard git ignore file for Python, Docker, etc.
+├── README.md             # The main project documentation we've been writing
+├── docker-compose.yml    # The master file to orchestrate all services
+│
+├── bng-simulator/
+│   ├── Dockerfile        # Dockerfile to build the BNG simulator container
+│   ├── requirements.txt  # Python dependencies (pygnmi, etc.)
+│   └── simulator.py      # The Python script that generates data and runs the gNMI server
+│
+├── telegraf/
+│   └── telegraf.conf     # Telegraf configuration for gNMI input and InfluxDB output
+│
+├── grafana/
+│   ├── dashboards/       # Directory for dashboard JSON models
+│   │   └── bng-dashboard.json
+│   └── provisioning/
+│       ├── dashboards.yml  # Grafana config to auto-load dashboards
+│       └── datasources.yml # Grafana config to auto-provision the InfluxDB data source
+│
+└── jupyter/
+    ├── Dockerfile        # Dockerfile to build the Jupyter Lab environment
+    ├── requirements.txt  # Python dependencies for analytics (pandas, scikit-learn, etc.)
+    └── notebooks/
+        └── 1-Anomaly-Detection.ipynb # The sample notebook for ML analysis
 ---
 
 ## 3. Component Breakdown
@@ -284,3 +311,213 @@ This POC provides a solid foundation, but there are numerous avenues for future 
 *   **Authentication and Authorization**: Configure proper authentication (e.g., client certificates for gNMI, API tokens for InfluxDB and Grafana) and authorization mechanisms for all components.
 
 These enhancements would further mature the POC into a robust, production-ready solution for managing and optimizing BNG networks.
+
+---
+
+## 8. Usage and Demonstration
+
+Once the stack is running, you can explore the various components to see the end-to-end data flow and analytics in action.
+
+### 8.1. Visualizing Telemetry in Grafana
+
+The Grafana service is pre-configured with a connection to the InfluxDB data source and a pre-built dashboard for BNG subscriber monitoring.
+
+1.  **Access Grafana**: Open your web browser and navigate to [http://localhost:3000](http://localhost:3000).
+2.  **Login**: Use the default credentials (`admin`/`admin`) and change the password when prompted.
+3.  **Open the Dashboard**:
+    *   On the left-hand menu, click on the **Dashboards** icon.
+    *   Click on the **"BNG Subscriber Monitoring"** dashboard.
+
+You will see several panels visualizing the data streamed from the BNG Simulator in near real-time:
+
+*   **Active Subscribers**: A gauge showing the current count of active subscribers.
+*   **Total Bandwidth (Input/Output)**: A time-series graph displaying the aggregate ingress and egress traffic across all subscribers.
+*   **Top Subscribers by Input Traffic**: A table view that lists each subscriber and their total traffic volume in the selected time range, allowing you to identify the top talkers.
+
+The dashboard should update automatically as the BNG Simulator generates new data.
+
+### 8.2. Running AI/ML Analytics in Jupyter
+
+The Jupyter environment is set up with a sample notebook to perform anomaly detection on the collected traffic data.
+
+1.  **Access JupyterLab**: Open your browser and go to [http://localhost:8888](http://localhost:8888).
+2.  **Login**: You will need a token to log in for the first time. Get it by checking the logs of the Jupyter container:
+    ```bash
+    docker-compose logs jupyter
+    ```
+    Look for a URL in the logs containing the token, like `http://127.0.0.1:8888/lab?token=...`. Copy the full URL into your browser, or just the token value into the login page.
+
+3.  **Open the Notebook**:
+    *   In the file browser on the left, double-click on the `1-Anomaly-Detection.ipynb` file to open it.
+4.  **Run the Analysis**:
+    *   The notebook contains a series of cells with Python code and explanations.
+    *   You can run each cell sequentially by clicking on it and pressing **Shift + Enter**.
+    *   The notebook will:
+        1.  Establish a connection to the InfluxDB database.
+        2.  Query the traffic data (`input_octets`) for the last hour.
+        3.  Use the **Isolation Forest** algorithm from `scikit-learn` to identify subscribers whose traffic patterns deviate significantly from the norm.
+        4.  Print a list of MAC addresses for the subscribers that have been flagged as anomalous.
+
+This demonstration showcases how the stored telemetry data can be leveraged for more advanced, offline analysis to uncover insights that may not be apparent from real-time visualization alone.
+
+Of course. A troubleshooting guide is an essential part of any good `README`. Here is a section covering common issues and their solutions.
+
+---
+
+## 9. Troubleshooting
+
+If you encounter issues while running the POC, here are some common problems and how to resolve them.
+
+### 9.1. General Commands
+
+*   **Check container status**: To see which services are running, stopped, or have errors.
+    ```bash
+    docker-compose ps
+    ```
+*   **View logs for a specific service**: This is the most important step for debugging. Replace `<service_name>` with `telegraf`, `bng-simulator`, `influxdb`, etc.
+    ```bash
+    docker-compose logs <service_name>
+    ```
+*   **Follow logs in real-time**:
+    ```bash
+    docker-compose logs -f <service_name>
+    ```
+
+### 9.2. Issue: No data in Grafana dashboards
+
+If your dashboards are empty or show "No Data":
+
+1.  **Check Telegraf Logs**: This is the most likely place to find the issue.
+    ```bash
+    docker-compose logs telegraf
+    ```
+    *   Look for errors connecting to the `bng-simulator` (e.g., `connection refused`). This means the simulator might not be running correctly.
+    *   Look for errors connecting to `influxdb` (e.g., `unauthorized`). This could be a token or configuration mismatch.
+    *   If there are no errors, Telegraf might not be parsing the data correctly. Check that the `[[inputs.gnmi.json_v2]]` section in `telegraf.conf` matches the data structure in `simulator.py`.
+
+2.  **Check BNG Simulator Logs**: Ensure the simulator started correctly and is generating data.
+    ```bash
+    docker-compose logs bng-simulator
+    ```
+    You should see log messages like "Refreshing telemetry data..." and "gNMI server starting...".
+
+3.  **Check InfluxDB Manually**:
+    *   Go to the InfluxDB UI at [http://localhost:8086](http://localhost:8086).
+    *   Login with the credentials from your `.env` file.
+    *   On the left menu, go to **Explore** (or **Data Explorer**).
+    *   In the query builder, select the `bng-bucket`, the `bng_subscriber_stats` measurement, and a field like `input_octets`.
+    *   If you see data here, the problem is with Grafana. If you don't, the problem is with Telegraf or the simulator.
+
+### 9.3. Issue: Jupyter Notebook cannot connect to InfluxDB
+
+If you get a connection error when running the cells in the `1-Anomaly-Detection.ipynb` notebook:
+
+1.  **Verify InfluxDB is Running**: Run `docker-compose ps` and ensure the `influxdb` container is `Up`.
+2.  **Check Environment Variables**: The notebook connects using environment variables passed to the Jupyter container. Check the `environment` section for the `jupyter` service in your `docker-compose.yml` file and ensure the variable names match what's used in the notebook's first code cell.
+
+### 9.4. How to Reset the Entire Stack
+
+If you want to start completely fresh, clearing all stored data in InfluxDB and Grafana:
+
+1.  **Stop and Remove Containers**: The `-v` flag is crucial as it also removes the Docker volumes where the data is stored.
+    ```bash
+    docker-compose down -v
+    ```
+2.  **Relaunch the Stack**:
+    ```bash
+    docker-compose up -d
+    ```
+
+## Additional Information
+
+### 1. Understanding gNMI, gRPC, and YANG 
+
+To effectively model your BNG subscriber data, it's essential to understand the roles of gNMI, gRPC, and YANG: 
+
+*   **gRPC (gRPC Remote Procedure Calls)**: A modern, open-source, high-performance RPC framework that can run in any environment. It is the foundation for gNMI, providing a robust and efficient transport mechanism. 
+*   **YANG (Yet Another Next Generation)**: A data modeling language used to model configuration and state data of network elements. YANG is used to create a structured, predictable, and vendor-neutral representation of the data you want to stream. 
+*   **gNMI (gRPC Network Management Interface)**: An open-source protocol for network management and streaming telemetry from network devices. It uses gRPC for transport and YANG for data modeling. gNMI is particularly well-suited for AI analytics due to its efficiency and ability to stream data in near real-time. 
+
+### 2. Proposed YANG Model for BNG Subscriber Data 
+
+Below is a proposed hierarchical structure for a YANG model based on the provided subscriber information. This model organizes the data into logical groups, making it easier to query and analyze. 
+
+**Top-Level Container:** `bng-subscriber-telemetry` 
+
+This container will hold all the subscriber-related telemetry data. 
+
+**Subscriber List:** `subscribers` 
+
+This is a list of all subscribers, keyed by their MAC address for unique identification. 
+
+```
+/bng-subscriber-telemetry
+  /subscribers
+    /subscriber[mac-address='...'] 
+```
+
+**Within each subscriber entry, the data is further broken down into the following containers:** 
+
+*   **/identity**: Contains static identification information for the subscriber. 
+    *   `mac-address` (string) 
+    *   `s-vlan` (uint16) 
+    *   `c-vlan` (uint16) 
+    *   `interface-name` (string) 
+    *   `option82` (string) 
+*   **/state**: Reflects the current operational state of the subscriber. 
+    *   `current-state` (enumeration: ACTIVE, INACTIVE, etc.) 
+    *   `activation-timestamp` (timestamp) 
+*   **/sessions**: A list of IP sessions associated with the subscriber, keyed by session ID. 
+    *   `session[session-id='...']` 
+        *   `session-id` (uint64) 
+        *   `session-state` (enumeration: ACTIVE, INACTIVE, etc.) 
+        *   `ip-address-family` (identity: ipv4, ipv6) 
+        *   `ip-address` (inet:ip-address) 
+        *   `prefix` (inet:ip-prefix) 
+        *   `subnet-mask` (inet:ip-address) 
+        *   `default-gateway` (inet:ip-address) 
+        *   `lease-time` (uint32) 
+        *   `allocation-timestamp` (timestamp) 
+*   **/policies**: Details about policies applied to the subscriber. 
+    *   `control-policy-id` (uint32) 
+    *   `gx-enabled` (boolean) 
+    *   `dynamic-policy-name` (string) 
+*   **/statistics**: A comprehensive set of counters for various protocols and events. This is highly valuable for anomaly detection and trend analysis. 
+    *   `/dhcpv4` 
+    *   `/dhcpv6` 
+    *   `/radius-authentication` 
+    *   `/radius-accounting` 
+    *   `/session-activation` 
+    *   `/hardware-counters` 
+*   **/event-history**: A log of significant events in the subscriber's lifecycle. 
+    *   `event[timestamp='...']` 
+        *   `timestamp` (timestamp) 
+        *   `graph-name` (string) 
+        *   `event-name` (string) 
+        *   `current-state` (string) 
+
+### 3. Streaming Data with gNMI for AI Analytics 
+
+With a YANG model in place, you can use gNMI to stream the data to your AI analytics platform. gNMI offers several subscription modes, with `STREAM` being the most powerful for continuous monitoring: 
+
+*   **`STREAM` Subscriptions**: This mode allows for continuous data streaming and has two sub-modes: 
+    *   **`SAMPLE`**: Data is streamed at a specified interval (e.g., every 30 seconds). This is ideal for collecting time-series data like traffic counters for trend analysis and forecasting. 
+    *   **`ON_CHANGE`**: Data is streamed only when a value changes. This is highly efficient for monitoring state changes, such as subscriber session state transitions or policy updates, which can be critical inputs for real-time anomaly detection. 
+
+**Example gNMI Subscriptions:** 
+
+*   **To monitor session state changes for all subscribers in real-time:** 
+    *   **Path**: `/bng-subscriber-telemetry/subscribers/subscriber/sessions/session/session-state` 
+    *   **Mode**: `STREAM` 
+    *   **Sub-mode**: `ON_CHANGE` 
+*   **To sample DHCP statistics every minute for a specific subscriber:** 
+    *   **Path**: `/bng-subscriber-telemetry/subscribers/subscriber[mac-address='00:10:94:aa:00:01']/statistics/dhcpv4` 
+    *   **Mode**: `STREAM` 
+    *   **Sub-mode**: `SAMPLE` 
+    *   **Interval**: 60 seconds 
+
+### 4. Vendor Documentation and Industry Standards 
+
+While this model is a robust starting point based on your provided data, it's highly recommended to consult vendor-specific documentation for their YANG models. Additionally, standards bodies like the **Broadband Forum (BBF)** and **OpenConfig** offer standardized YANG models for BNG and subscriber management. Aligning with these standards will ensure greater interoperability and a more comprehensive set of telemetry data. 
+
+By modeling your BNG subscriber data with YANG and streaming it via gNMI, you can create a powerful data pipeline to fuel your AI analytics, enabling proactive network monitoring, anomaly detection, and capacity planning.

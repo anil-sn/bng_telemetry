@@ -1,0 +1,21 @@
+# This file configures Grafana to automatically load dashboards from a specified directory.
+
+apiVersion: 1
+
+providers:
+  # The 'default' provider
+  - name: 'default'
+    # The organization ID to which the dashboards will be imported
+    orgId: 1
+    # The folder in the Grafana UI where the dashboards will appear
+    folder: ''
+    # The type of the provider, 'file' means it scans a directory
+    type: file
+    # When set to true, Grafana will not allow you to delete the dashboard from the UI
+    disableDeletion: false
+    # When set to true, you can edit the dashboard in the UI and save your changes
+    editable: true
+    # The path inside the container where Grafana should look for dashboard JSON files.
+    # This path is mapped to our local './grafana/dashboards/' directory in docker-compose.yml.
+    options:
+      path: /var/lib/grafana/dashboards
