@@ -1,11 +1,8 @@
-# Python client for InfluxDB v2
-# The [ciso] extra installs a fast C-based parser for performance
-influxdb-client[ciso]>=1.20.0
-
-# Core data science libraries
-# Note: Many of these are already in the base scipy-notebook image,
-# but listing them here ensures they are present and allows for version pinning.
-pandas>=1.3.0
-scikit-learn>=1.0.0
-numpy>=1.20.0
-matplotlib>=3.4.0
+jupyterlab>=4.0.0
+influxdb-client>=1.38.0
+pandas>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.15.0
