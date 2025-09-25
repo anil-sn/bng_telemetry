@@ -35,6 +35,7 @@ The data flows through the system as follows:
 +----------------------------------------+      +--------------------------------------+
 
 ```
+```
 bng_telemetry/
 ├── .env                  # Environment variables for InfluxDB credentials and config
 ├── .env.example          # Example environment file for users to copy
@@ -62,6 +63,7 @@ bng_telemetry/
     ├── requirements.txt  # Python dependencies for analytics (pandas, scikit-learn, etc.)
     └── notebooks/
         └── 1-Anomaly-Detection.ipynb # The sample notebook for ML analysis
+```
 ---
 
 ## 3. Component Breakdown
