@@ -1,88 +1,134 @@
 version: '3.8'
 
 services:
-  bng-simulator:
-    build: ./bng-simulator
-    container_name: bng-simulator
-    restart: unless-stopped
-    networks:
-      - bng-net
-    # Note: We don't map the gNMI port to the host, as only Telegraf needs it.
-
-  telegraf:
-    image: telegraf:latest
-    container_name: telegraf
-    restart: unless-stopped
-    volumes:
-      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
-    networks:
-      - bng-net
-    depends_on:
-      - bng-simulator
-      - influxdb
-    environment:
-      - INFLUX_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
-
   influxdb:
-    image: influxdb:latest
-    container_name: influxdb
-    restart: unless-stopped
+    image: influxdb:2.7
     ports:
       - "8086:8086"
-    volumes:
-      - influxdb-data:/var/lib/influxdb2
-    networks:
-      - bng-net
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
-      - DOCKER_INFLUXDB_INIT_PASSWORD=${DOCKER_INFLUXDB_INIT_PASSWORD}
-      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
-      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
     volumes:
-      - ./grafana/provisioning/:/etc/grafana/provisioning/
-      - ./grafana/dashboards/:/var/lib/grafana/dashboards/
-      - grafana-data:/var/lib/grafana
+      - influxdb-data:/var/lib/influxdb2
+      - ./init-influxdb.sh:/docker-entrypoint-initdb.d/init.sh  # New: Auto-setup script (add this file next if needed)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - bng-net
+
+  bng-simulator:
+    build: ./bng-simulator
+    ports:
+      - "50051:50051"
     depends_on:
-      - influxdb
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:50051"]  # Assumes grpc_health_probe installed; alt: python -c "import sys; sys.exit(0)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - bng-net
+
+  telegraf:
+    image: telegraf:1.28
+    depends_on:
+      bng-simulator:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    environment:
+      - INFLUX_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUX_ORG=${INFLUXDB_ORG}
+      - INFLUX_BUCKET=${INFLUXDB_BUCKET}
+      - INFLUX_URL=http://influxdb:8086
+    healthcheck:
+      test: ["CMD", "telegraf", "--test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        mode: "non-blocking"  # For debug verbosity
+    networks:
+      - bng-net
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    ports:
+      - "3000:3000"
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_DATASOURCES_DEFAULT_DATASOURCE_URL=http://influxdb:8086
-      - GF_DATASOURCES_DEFAULT_DATASOURCE_SECURE_JSON_DATA_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - bng-net
 
   jupyter:
     build: ./jupyter
-    container_name: jupyter
-    restart: unless-stopped
     ports:
       - "8888:8888"
+    depends_on:
+      influxdb:
+        condition: service_healthy
     volumes:
-      - ./jupyter/notebooks:/home/jovyan/work
+      - ./jupyter/notebooks:/notebooks
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - INFLUX_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUX_ORG=${INFLUXDB_ORG}
+      - INFLUX_BUCKET=${INFLUXDB_BUCKET}
+      - INFLUX_URL=http://influxdb:8086
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - bng-net
-    depends_on:
-      - influxdb
-    environment:
-      - INFLUXDB_URL=http://influxdb:8086
-      - INFLUXDB_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
-      - INFLUXDB_ORG=${DOCKER_INFLUXDB_INIT_ORG}
-      - INFLUXDB_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+
+volumes:
+  influxdb-data:
 
 networks:
   bng-net:
     driver: bridge
-
-volumes:
-  influxdb-data:
-  grafana-data:
