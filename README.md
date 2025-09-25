@@ -66,6 +66,53 @@ bng_telemetry/
 ```
 ---
 
+## Step-by-Step Instructions to Build and Run
+
+You don't need separate "compile" and "build" commands. Docker Compose combines them into a single, easy workflow.
+
+### 1. Prerequisites
+
+Make sure you have Docker and Docker Compose installed and running on your machine.
+
+### 2. The Primary Command (Build & Run)
+
+The most common command you will use is `docker-compose up`. This command intelligently handles both building the images and starting the containers.
+
+1.  Navigate to the root directory of the project in your terminal.
+2.  Run the following command:
+
+    ```bash
+    docker-compose up -d --build
+    ```
+
+    *   `up`: This is the command to create and start the containers.
+    *   `-d`: (Detached mode) Runs the containers in the background so your terminal is free.
+    *   `--build`: This flag explicitly tells Docker Compose to **build the images** from the `Dockerfile`s before starting the services. If you've made any changes to your Python code or `requirements.txt`, you should use this flag to ensure those changes are included in the new image.
+
+### 3. To Only Build (Without Running)
+
+If you only want to build the images without starting the application, you can use the `build` command:
+
+```bash
+docker-compose build
+```
+
+This will create the images for `bng-simulator` and `jupyter` and make them ready for future use. This can be useful in a CI/CD pipeline where you might build in one step and deploy in another.
+
+### Summary
+```
+----------------------------------------------------------------------------------------------
+| Your Goal                                              | The Command You Should Run        |
+| ------------------------------------------------------ | ----------------------------------|
+| **Build the project and run it** (most common)         | `docker-compose up -d --build`    |
+| **Just rebuild the images** (e.g., after code changes) | `docker-compose build`            |
+| **Restart the services** (using existing images)       | `docker-compose restart`          |
+| **Stop and remove everything**                         | `docker-compose down -v`          |
+----------------------------------------------------------------------------------------------
+```
+In short: **`docker-compose up -d --build` is your "compile and build" command for this entire project.**
+
+---
 ## 3. Component Breakdown
 
 This section provides a detailed look at each component in the technology stack and its specific role within this POC.
