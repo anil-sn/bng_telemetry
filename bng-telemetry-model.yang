@@ -1,0 +1,104 @@
+module bng-telemetry-model {
+  yang-version 1.1;
+  namespace "http://example.com/bng-telemetry";
+  prefix "bng-tel";
+
+  organization "BNG Telemetry POC";
+  contact "mailto:admin@example.com";
+  description
+    "A YANG model for streaming per-subscriber telemetry data from a
+     Broadband Network Gateway (BNG).";
+
+  revision 2025-09-25 {
+    description "Initial version.";
+    reference "BNG Telemetry Project";
+  }
+
+  // Top-level container for all telemetry data
+  container bng-telemetry {
+    description "Root container for BNG subscriber telemetry.";
+
+    list subscriber {
+      key "mac-address";
+      description "A list of subscribers, keyed by their MAC address.";
+
+      leaf mac-address {
+        type string;
+        description "Unique MAC address of the subscriber's device.";
+      }
+
+      container identity {
+        description "Static identifying information for the subscriber.";
+        leaf s-vlan {
+          type uint16;
+          description "Service VLAN tag.";
+        }
+        leaf c-vlan {
+          type uint16;
+          description "Customer VLAN tag.";
+        }
+        leaf interface-name {
+          type string;
+          description "Physical or logical interface the subscriber is on.";
+        }
+        leaf option82 {
+          type string;
+          description "DHCP Relay Agent Information (Option 82).";
+        }
+      }
+
+      container state {
+        description "Dynamic state of the subscriber session.";
+        leaf current-state {
+          type string; // In a real model, this would be an enumeration
+          description "The current operational state, e.g., ACTIVE, INACTIVE.";
+        }
+        leaf activation-timestamp {
+          type uint64;
+          description "Timestamp of the last activation.";
+        }
+      }
+
+      container statistics {
+        description "Counters for various protocols and hardware metrics.";
+        
+        container hardware {
+          leaf input-octets {
+            type uint64;
+            description "Total number of incoming bytes for the subscriber.";
+          }
+          leaf output-octets {
+            type uint64;
+            description "Total number of outgoing bytes for the subscriber.";
+          }
+        }
+
+        container dhcpv4 {
+          leaf rx-request {
+            type uint64;
+            description "Count of received DHCPv4 Request packets.";
+          }
+          leaf tx-ack {
+            type uint64;
+            description "Count of transmitted DHCPv4 ACK packets.";
+          }
+        }
+        
+        container radius {
+            leaf tx-auth-request {
+                type uint64;
+                description "Count of transmitted RADIUS Authentication Requests.";
+            }
+            leaf rx-auth-success {
+                type uint64;
+                description "Count of received RADIUS Authentication Success messages.";
+            }
+            leaf tx-interim-request {
+                type uint64;
+                description "Count of transmitted RADIUS Interim Accounting updates.";
+            }
+        }
+      }
+    }
+  }
+}
